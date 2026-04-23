@@ -1,74 +1,182 @@
+// ==============================================
+// 📦 IMPORTACIONES Y CONFIGURACIÓN INICIAL
+// ==============================================
 const express = require('express');
-const pool = require('./db');  // Importamos la conexión a PostgreSQL
-const app = express();
-const PORT = 3000;
+const { Pool } = require('pg');
 
-// Middleware para que Express entienda JSON
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware para leer JSON en las peticiones
 app.use(express.json());
 
-// Ruta principal de prueba
+// Configuración de PostgreSQL
+const pool = new Pool({
+  user: 'postgres',
+  host: 'localhost',
+  database: 'happiness_db',
+  password: '123456',
+  port: 5432
+});
+
+// ==============================================
+// 🏠 RUTA DE PRUEBA
+// ==============================================
 app.get('/', (req, res) => {
-    res.send('API funcionando correctamente');
+  res.send('✅ API funcionando correctamente');
 });
 
-// Ruta para obtener TODOS los alumnos (GET)
+// ==============================================
+// 👥 RUTAS PARA LA TABLA "alumno"
+// ==============================================
+
+// GET: Obtener todos los alumnos
 app.get('/alumnos', async (req, res) => {
-    try {
-        const resultado = await pool.query('SELECT * FROM alumno ORDER BY id');
-        res.json(resultado.rows);
-    } catch (error) {
-        console.error('Error al consultar alumnos:', error);
-        res.status(500).json({ error: 'Error al obtener los alumnos' });
-    }
+  try {
+    const resultado = await pool.query('SELECT * FROM alumno ORDER BY id');
+    res.json(resultado.rows);
+  } catch (error) {
+    console.error('❌ Error GET /alumnos:', error);
+    res.status(500).json({ error: 'Error al obtener los alumnos' });
+  }
 });
 
-// ==============================================
-// 👇 NUEVA RUTA POST - INSERTAR ALUMNOS (PASO 3)
-// ==============================================
+// GET: Obtener un alumno por ID (✅ NUEVO - Actividad)
+app.get('/alumnos/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validación: ID debe ser numérico
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'El id debe ser numérico' });
+    }
+
+    const resultado = await pool.query(
+      'SELECT * FROM alumno WHERE id = $1',
+      [id]
+    );
+
+    if (resultado.rows.length === 0) {
+      return res.status(404).json({ error: 'Alumno no encontrado' });
+    }
+
+    res.json(resultado.rows[0]);
+  } catch (error) {
+    console.error('❌ Error GET /alumnos/:id:', error);
+    res.status(500).json({ error: 'Error al obtener el alumno' });
+  }
+});
+
+// POST: Insertar nuevo alumno
 app.post('/alumnos', async (req, res) => {
-    try {
-        // 1. Obtener los datos del cuerpo de la petición
-        const { nombre, apellido, edad, correo } = req.body;
+  try {
+    const { nombre, apellido, edad, correo } = req.body;
 
-        // 2. Validar que todos los campos estén presentes
-        if (!nombre || !apellido || !edad || !correo) {
-            return res.status(400).json({ 
-                error: 'Todos los campos son obligatorios: nombre, apellido, edad, correo' 
-            });
-        }
-
-        // 3. Insertar el nuevo alumno en la base de datos
-        const resultado = await pool.query(
-            'INSERT INTO alumno (nombre, apellido, edad, correo) VALUES ($1, $2, $3, $4) RETURNING *',
-            [nombre, apellido, edad, correo]
-        );
-
-        // 4. Responder con éxito (código 201 = Creado)
-        res.status(201).json({
-            mensaje: 'Alumno insertado correctamente',
-            alumno: resultado.rows[0]
-        });
-
-    } catch (error) {
-        console.error('Error al insertar alumno:', error);
-        
-        // Si el error es por correo duplicado (código 23505 de PostgreSQL)
-        if (error.code === '23505') {
-            return res.status(409).json({ 
-                error: 'El correo ya está registrado. Usa otro correo.' 
-            });
-        }
-        
-        res.status(500).json({ error: 'Error interno al insertar el alumno' });
+    if (!nombre || !apellido || !edad || !correo) {
+      return res.status(400).json({ 
+        error: 'Todos los campos son obligatorios: nombre, apellido, edad, correo' 
+      });
     }
+
+    const resultado = await pool.query(
+      'INSERT INTO alumno (nombre, apellido, edad, correo) VALUES ($1, $2, $3, $4) RETURNING *',
+      [nombre, apellido, edad, correo]
+    );
+
+    res.status(201).json({
+      mensaje: 'Alumno insertado correctamente',
+      alumno: resultado.rows[0]
+    });
+
+  } catch (error) {
+    console.error('❌ Error POST /alumnos:', error);
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'El correo ya está registrado' });
+    }
+    res.status(500).json({ error: 'Error interno al insertar el alumno' });
+  }
 });
+
 // ==============================================
-// 👆 FIN DE LA RUTA POST
+// 📚 RUTAS PARA LA TABLA "materia"
 // ==============================================
 
-// Iniciar el servidor
+// GET: Obtener todas las materias
+app.get('/materias', async (req, res) => {
+  try {
+    const resultado = await pool.query('SELECT * FROM materia ORDER BY id');
+    res.json(resultado.rows);
+  } catch (error) {
+    console.error('❌ Error GET /materias:', error);
+    res.status(500).json({ error: 'Error al obtener las materias' });
+  }
+});
+
+// GET: Obtener una materia por ID (✅ NUEVO - Actividad)
+app.get('/materias/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validación: ID debe ser numérico
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'El id debe ser numérico' });
+    }
+
+    const resultado = await pool.query(
+      'SELECT * FROM materia WHERE id = $1',
+      [id]
+    );
+
+    if (resultado.rows.length === 0) {
+      return res.status(404).json({ error: 'Materia no encontrada' });
+    }
+
+    res.json(resultado.rows[0]);
+  } catch (error) {
+    console.error('❌ Error GET /materias/:id:', error);
+    res.status(500).json({ error: 'Error al obtener la materia' });
+  }
+});
+
+// POST: Insertar nueva materia
+app.post('/materias', async (req, res) => {
+  const { nombre, semestre, creditos } = req.body;
+
+  if (!nombre || semestre === undefined || semestre === null || creditos === undefined || creditos === null) {
+    return res.status(400).json({ 
+      error: 'Faltan campos obligatorios: nombre, semestre y creditos' 
+    });
+  }
+
+  try {
+    const query = `
+      INSERT INTO materia (nombre, semestre, creditos)
+      VALUES ($1, $2, $3)
+      RETURNING *;
+    `;
+    const resultado = await pool.query(query, [nombre, parseInt(semestre), parseInt(creditos)]);
+    
+    res.status(201).json({ 
+      mensaje: 'Materia registrada correctamente',
+      materia: resultado.rows[0]
+    });
+
+  } catch (error) {
+    console.error('❌ Error POST /materias:', error);
+    res.status(500).json({ error: 'Error al guardar la materia' });
+  }
+});
+
+// ==============================================
+// 🚀 INICIAR SERVIDOR
+// ==============================================
 app.listen(PORT, () => {
-    console.log(`Servidor corriendo en http://localhost:${PORT}`);
-    console.log(`Prueba la ruta GET: http://localhost:${PORT}/alumnos`);
-    console.log(`Prueba la ruta POST: http://localhost:${PORT}/alumnos (usando Postman)`);
+  console.log(`✅ Servidor corriendo en http://localhost:${PORT}`);
+  console.log(`📌 Rutas disponibles:`);
+  console.log(`   • GET  /alumnos      → Todos los alumnos`);
+  console.log(`   • GET  /alumnos/:id  → Alumno por ID`);
+  console.log(`   • POST /alumnos      → Insertar alumno`);
+  console.log(`   • GET  /materias     → Todas las materias`);
+  console.log(`   • GET  /materias/:id → Materia por ID`);
+  console.log(`   • POST /materias     → Insertar materia`);
 });
